@@ -18,7 +18,6 @@ public class SortingVisualizer extends JPanel {
     private MidiChannel[] channels;
     private int velocity = 10; 
 
-    // GUI Components
     private JComboBox<String> algorithmComboBox;
     private JTextField sizeField;
     private JTextField maxValueField;
@@ -26,7 +25,7 @@ public class SortingVisualizer extends JPanel {
     private JButton generateButton;
     private JButton startButton;
     private JButton stopButton;
-    private final Color DARK_GREEN = new Color(0, 100, 0); // Темно-зеленый цвет
+    private final Color DARK_GREEN = new Color(0, 100, 0);
 
     public SortingVisualizer() {
         generateArray(100, 100);
@@ -48,7 +47,6 @@ public class SortingVisualizer extends JPanel {
         algorithmComboBox = new JComboBox<>(new String[]{
             "Merge Sort", "Quick Sort", "Heap Sort", "Radix Sort"
         });
-        // Добавленный слушатель изменений
         algorithmComboBox.addActionListener(e -> {
             algorithm = (String) algorithmComboBox.getSelectedItem();
         });
@@ -111,7 +109,7 @@ public class SortingVisualizer extends JPanel {
         for (int i = 0; i < size; i++) {
             array[i] = rand.nextInt(maxElement) + 1;
         }
-        barWidth = Math.max(1, getWidth() / size); // Автоподбор ширины столбцов
+        barWidth = Math.max(1, getWidth() / size);
         repaint();
     }
 
@@ -129,14 +127,12 @@ public class SortingVisualizer extends JPanel {
     private void playNote(int value, int maxValue) {
         if (synthesizer == null || !synthesizer.isOpen()) return;
         
-        // Преобразуем значение элемента в частоту (50-2000 Гц)
         int minFreq = 50;
         int maxFreq = 2000;
         int freq = minFreq + (value * (maxFreq - minFreq)) / maxValue;
         
-        // Преобразуем частоту в MIDI-ноту
         int note = (int) (12 * (Math.log(freq / 440.0) / Math.log(2)) + 69);
-        note = Math.min(127, Math.max(0, note)); // Ограничиваем диапазон
+        note = Math.min(127, Math.max(0, note));
         
         channels[0].noteOn(note, velocity);
     }
@@ -295,12 +291,10 @@ public class SortingVisualizer extends JPanel {
     private void heapSort() {
         int n = array.length;
     
-        // Построение max-heap
         for (int i = n / 2 - 1; i >= 0 && !Thread.currentThread().isInterrupted(); i--) {
             heapify(n, i);
         }
     
-        // Извлечение элементов из кучи
         for (int i = n - 1; i > 0 && !Thread.currentThread().isInterrupted(); i--) {
             current = 0;
             next = i;
