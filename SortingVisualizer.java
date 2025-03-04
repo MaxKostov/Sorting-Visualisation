@@ -4,6 +4,7 @@ import java.awt.event.ActionEvent;
 import java.util.Arrays;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
+import javax.sound.midi.*;
 
 public class SortingVisualizer extends JPanel {
     private int[] array;
@@ -13,6 +14,9 @@ public class SortingVisualizer extends JPanel {
     private int current = -1, next = -1;
     private AtomicBoolean isSorting = new AtomicBoolean(false);
     private Thread sortingThread;
+    private Synthesizer synthesizer;
+    private MidiChannel[] channels;
+    private int velocity = 10; 
 
     // GUI Components
     private JComboBox<String> algorithmComboBox;
@@ -27,6 +31,15 @@ public class SortingVisualizer extends JPanel {
     public SortingVisualizer() {
         generateArray(100, 100);
         setLayout(new BorderLayout());
+
+        try {
+            synthesizer = MidiSystem.getSynthesizer();
+            synthesizer.open();
+            channels = synthesizer.getChannels();
+            channels[0].programChange(2);
+        } catch (MidiUnavailableException e) {
+            System.err.println("MIDI синтезатор недоступен");
+        }
         
         JPanel controlPanel = new JPanel(new GridLayout(2, 1));
         JPanel topPanel = new JPanel();
@@ -40,9 +53,9 @@ public class SortingVisualizer extends JPanel {
             algorithm = (String) algorithmComboBox.getSelectedItem();
         });
     
-        sizeField = new JTextField("100", 5);
-        maxValueField = new JTextField("100", 5);
-        delayField = new JTextField("100", 5);
+        sizeField = new JTextField("1000", 5);
+        maxValueField = new JTextField("1000", 5);
+        delayField = new JTextField("1", 5);
 
         generateButton = new JButton("Generate New Array");
         generateButton.addActionListener(e -> generateNewArray());
@@ -73,6 +86,7 @@ public class SortingVisualizer extends JPanel {
     }
 
     private void stopSorting() {
+        stopNote();
         if (sortingThread != null && sortingThread.isAlive()) {
             isSorting.set(false);
             sortingThread.interrupt();
@@ -112,15 +126,42 @@ public class SortingVisualizer extends JPanel {
         }
     }
 
+    private void playNote(int value, int maxValue) {
+        if (synthesizer == null || !synthesizer.isOpen()) return;
+        
+        // Преобразуем значение элемента в частоту (50-2000 Гц)
+        int minFreq = 50;
+        int maxFreq = 2000;
+        int freq = minFreq + (value * (maxFreq - minFreq)) / maxValue;
+        
+        // Преобразуем частоту в MIDI-ноту
+        int note = (int) (12 * (Math.log(freq / 440.0) / Math.log(2)) + 69);
+        note = Math.min(127, Math.max(0, note)); // Ограничиваем диапазон
+        
+        channels[0].noteOn(note, velocity);
+    }
+
+    private void stopNote() {
+        if (synthesizer != null && synthesizer.isOpen()) {
+            channels[0].allNotesOff();
+        }
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         if (array == null) return;
+
+        int maxValue = Arrays.stream(array).max().getAsInt();
         
         for (int i = 0; i < array.length; i++) {
             int height = (int)((array[i] / (double)Arrays.stream(array).max().getAsInt()) * (getHeight() - 50));
             g.setColor((i == current || i == next) ? Color.RED : DARK_GREEN);
             g.fillRect(i * barWidth, getHeight() - height, barWidth, height);
+
+            if (i == current || i == next) {
+                playNote(array[i], maxValue);
+            }
         }
     }
 
@@ -151,6 +192,9 @@ public class SortingVisualizer extends JPanel {
                         radixSort();
                         break;
                 }
+                if (!Thread.currentThread().isInterrupted()) {
+                    finishAnimation();
+                }
             } finally {
                 isSorting.set(false);
                 SwingUtilities.invokeLater(() -> {
@@ -161,6 +205,18 @@ public class SortingVisualizer extends JPanel {
             }
         });
         sortingThread.start();
+    }
+
+    private void finishAnimation() {
+        for (int i = 0; i < array.length && !Thread.currentThread().isInterrupted(); i++) {
+            current = i;
+            next = -1;
+            repaint();
+            sleep();
+        }
+        current = -1;
+        next = -1;
+        repaint();
     }
 
 
@@ -204,6 +260,7 @@ public class SortingVisualizer extends JPanel {
             System.arraycopy(temp, 0, array, left, temp.length);
             repaint();
         }
+        repaint();
     }
     
     private void quickSort(int low, int high) {
@@ -231,6 +288,7 @@ public class SortingVisualizer extends JPanel {
             repaint();
             sleep();
         }
+        repaint();
         return i + 1;
     }
     
@@ -284,6 +342,7 @@ public class SortingVisualizer extends JPanel {
         }
         current = -1;
         next = -1;
+        repaint();
     }
     
     private void radixSort() {
@@ -319,6 +378,7 @@ public class SortingVisualizer extends JPanel {
         }
         current = -1;
         next = -1;
+        repaint();
     }
 
     private void swap(int i, int j) {
@@ -331,6 +391,7 @@ public class SortingVisualizer extends JPanel {
     private void sleep() {
         try {
             Thread.sleep(delay);
+            stopNote();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
